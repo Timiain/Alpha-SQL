@@ -87,8 +87,13 @@ class ExecutionTrajectoryRewardModel(RewardModel):
 
         candidate_embedding = self._embed_tokens(self._result_to_tokens(execution_result))
         reference_embedding = self._get_reference_embedding(end_node)
-        trajectory_reward = self._cosine(candidate_embedding, reference_embedding) if reference_embedding is not None else 0.5
         consistency_reward = end_node.consistency_score if end_node.consistency_score is not None else 0.0
-        reward = (1 - self.mix_consistency_alpha) * trajectory_reward + self.mix_consistency_alpha * consistency_reward
+        if reference_embedding is None:
+            # No reference trajectory available: fall back to consistency-only reward.
+            trajectory_reward = consistency_reward
+            reward = consistency_reward
+        else:
+            trajectory_reward = self._cosine(candidate_embedding, reference_embedding)
+            reward = (1 - self.mix_consistency_alpha) * trajectory_reward + self.mix_consistency_alpha * consistency_reward
         end_node.eter_reward = trajectory_reward
         return reward

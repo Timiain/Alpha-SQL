@@ -42,6 +42,8 @@ class MCTSSolver:
             "adaptive_alpha": 2.0,
             "max_adaptive_iters": 4,
             "max_children_per_expansion": 12,
+            "min_visits_before_prune": 3,
+            "high_info_gain_bonus_iters": 1,
         }
         if adaptive_mcts_kwargs:
             self.adaptive_mcts_kwargs.update(adaptive_mcts_kwargs)
@@ -59,9 +61,17 @@ class MCTSSolver:
     def select(self, node: MCTSNode) -> MCTSNode:
         current = node
         while current.children and not current.is_terminal():
-            eligible_children = [child for child in current.children if child.info_gain >= self.adaptive_mcts_kwargs["tau_low"] or child.N == 0]
+            min_visits_before_prune = int(self.adaptive_mcts_kwargs["min_visits_before_prune"])
+            tau_low = float(self.adaptive_mcts_kwargs["tau_low"])
+
+            # Avoid early over-pruning: only prune low-IG children after enough visits.
+            eligible_children = [
+                child for child in current.children
+                if child.N == 0 or child.N < min_visits_before_prune or child.info_gain >= tau_low
+            ]
             if not eligible_children:
-                return current
+                eligible_children = current.children
+
             if not all(child.N > 0 for child in eligible_children):
                 return next(child for child in eligible_children if child.N == 0)
             current = max(eligible_children, key=lambda child: self._ucb_score(child, current.N))
@@ -96,8 +106,15 @@ class MCTSSolver:
         return current
 
     def _adaptive_iterations_for_node(self, node: MCTSNode) -> int:
-        base = 1 + int(self.adaptive_mcts_kwargs["adaptive_alpha"] * max(node.info_gain, 0.0))
-        capped = min(base, int(self.adaptive_mcts_kwargs["max_adaptive_iters"]))
+        tau_high = float(self.adaptive_mcts_kwargs["tau_high"])
+        adaptive_alpha = float(self.adaptive_mcts_kwargs["adaptive_alpha"])
+        max_adaptive_iters = int(self.adaptive_mcts_kwargs["max_adaptive_iters"])
+        bonus_iters = int(self.adaptive_mcts_kwargs["high_info_gain_bonus_iters"])
+
+        base = 1 + int(adaptive_alpha * max(node.info_gain, 0.0))
+        if node.info_gain >= tau_high:
+            base += bonus_iters
+        capped = min(base, max_adaptive_iters)
         return max(1, capped)
 
     def backpropagate(self, node: MCTSNode):
