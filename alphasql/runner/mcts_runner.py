@@ -1,5 +1,5 @@
 from alphasql.algorithm.mcts.mcts import MCTSSolver
-from alphasql.algorithm.mcts.reward import MajorityVoteRewardModel
+from alphasql.algorithm.mcts.reward import MajorityVoteRewardModel, ExecutionTrajectoryRewardModel
 from alphasql.runner.task import Task
 from alphasql.config.mcts_config import MCTSConfig
 from pathlib import Path
@@ -46,6 +46,12 @@ class MCTSRunner:
         random.seed(self.config.random_seed)
         
     def run_one_task(self, task: Task) -> str:
+        reward_model_kwargs = self.config.reward_model_kwargs or {}
+        if self.config.reward_model_type == "execution_trajectory":
+            reward_model = ExecutionTrajectoryRewardModel(**reward_model_kwargs)
+        else:
+            reward_model = MajorityVoteRewardModel(reward_model_kwargs)
+
         mcts_solver = MCTSSolver(
             db_root_dir=self.config.db_root_dir,
             task=task,
@@ -54,7 +60,10 @@ class MCTSRunner:
             exploration_constant=self.config.exploration_constant,
             save_root_dir=self.config.save_root_dir,
             llm_kwargs=self.config.mcts_model_kwargs,
-            reward_model=MajorityVoteRewardModel(self.config.reward_model_kwargs)
+            reward_model=reward_model,
+            meta_action_prior=self.config.meta_action_prior,
+            multi_objective_weights=self.config.multi_objective_weights,
+            adaptive_mcts_kwargs=self.config.adaptive_mcts_kwargs
         )
         try:
             mcts_solver.solve()
