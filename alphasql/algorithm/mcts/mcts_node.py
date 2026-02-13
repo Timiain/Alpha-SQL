@@ -31,6 +31,7 @@ class MCTSNode:
                  revised_sql_query: Optional[str] = None,
                  final_sql_query: Optional[str] = None,
                  consistency_score: Optional[float] = None,
+                 eter_reward: Optional[float] = None,
                  is_valid_sql_query: Optional[bool] = None,
                  llm_kwargs: Optional[Dict[str, Any]] = None
                  ):
@@ -56,11 +57,14 @@ class MCTSNode:
         self.revised_sql_query = revised_sql_query
         self.final_sql_query = final_sql_query
         self.consistency_score = consistency_score
+        self.eter_reward = eter_reward
         self.is_valid_sql_query = is_valid_sql_query
         self.llm_kwargs = llm_kwargs
 
         self.Q = 0
         self.N = 0
+        self.info_gain = 0.0
+        self.action_prior = 0.0
     
     def create_children(self):
         if self.children:
@@ -72,5 +76,4 @@ class MCTSNode:
             
     def is_terminal(self):
         return self.node_type == MCTSNodeType.END
-
 
